@@ -16,7 +16,23 @@ function setup() {
 }
 
 function draw() {
-  background(0);
+  if (loaded) {
+    background(220);
+  } else {
+    background(0);
+    text("loading...", 20, 20);
+  }
+  let aShape = map(blip.progress(), 0, 1, 0, width);
+  ellipse(aShape, height / 3, 50, 50);
+
+  let sShape = map(pink.progress(), 0, 1, 0, width);
+  ellipse(sShape, height - 20, 50, 50);
+
+  let dShape = map(takerimba.progress(), 0, 1, 0, width);
+  ellipse(dShape, height / 2 + 20, 50, 50);
+
+  let fShape = map(tears.progress(), 0, 1, 0, width);
+  ellipse(fShape, height / 5, 50, 50);
 }
 
 // map keys to sounds
@@ -27,6 +43,7 @@ function keyTyped() {
       blip.start();
     } else if (key == "s") {
       pink.start();
+      console.log(pink.progress());
     } else if (key == "d") {
       takerimba.start();
     } else if (key == "f") {
