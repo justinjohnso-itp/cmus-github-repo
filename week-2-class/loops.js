@@ -33,12 +33,38 @@ Tone.loaded().then(function () {
 
 function keyTyped() {
   if (loaded) {
-    const now = Tone.now();
-    const d = bass._buffer.duration;
+    if (key == "a") {
+      if (drums.state == "stopped") {
+        drums.start();
+      } else {
+        drums.stop();
+      }
+    } else if (key == "s") {
+      if (chords.state == "stopped") {
+        chords.start();
+      } else {
+        chords.stop();
+      }
+    } else if (key == "d") {
+      if (bass.state == "stopped") {
+        bass.start();
+      } else {
+        bass.stop();
+      }
+    } else if (key == "f") {
+      if (melody.state == "stopped") {
+        melody.start();
+      } else {
+        melody.stop();
+      }
+    }
 
-    bass.start(now);
-    chords.start(now + d / 2);
-    drums.start(now + d);
-    melody.start(now + (d * 3) / 2);
+    // const now = Tone.now();
+    // const d = bass._buffer.duration;
+
+    // bass.start(now);
+    // chords.start(now + d / 2);
+    // drums.start(now + d);
+    // melody.start(now + (d * 3) / 2);
   }
 }
