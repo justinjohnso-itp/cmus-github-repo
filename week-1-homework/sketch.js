@@ -5,6 +5,9 @@ const wilhelmSound = new SimplePlayer("sounds/wilhelm.wav").toDestination();
 
 let sheepImage;
 let circlePos, squarePos, trianglePos;
+let pitchShift;
+let isDragging = false;
+let sheepY;
 
 // set a flag to show if the file has loaded yet
 let loaded = false;
@@ -22,8 +25,15 @@ function setup() {
   circlePos = { x: width / 4, y: height / 2 };
   squarePos = { x: width / 2, y: height / 2 };
   trianglePos = { x: (3 * width) / 4, y: height / 2 };
-
   angleMode(DEGREES);
+
+  // Create pitch shift effect
+  pitchShift = new Tone.PitchShift().toDestination();
+  sheepSound.disconnect();
+  sheepSound.connect(pitchShift);
+
+  // Initialize sheep position
+  sheepY = windowHeight - 250;
 }
 
 function draw() {
@@ -35,9 +45,15 @@ function draw() {
   }
 
   // Sheep
-  image(sheepImage, sheepSound.progress() * 200, windowHeight - 250, 200, 200);
+  image(sheepImage, sheepSound.progress() * 200, sheepY, 200, 200);
   sheepImage.hide();
-  console.log(sheepSound.progress()); // 0.0 - 1.0
+  console.log(sheepSound.progress()); // 0 -> 1
+
+  // Map vertical position to pitch shift
+  if (isDragging) {
+    let pitch = map(sheepY, windowHeight, 0, -12, 12);
+    pitchShift.pitch = pitch;
+  }
 
   // Draw circle with scaling
   push();
@@ -72,6 +88,28 @@ function draw() {
   fill(0, 0, 255); // Blue
   triangle(-50, 50, 0, -50, 50, 50);
   pop();
+}
+
+function mousePressed() {
+  // Check if mouse is over sheep
+  if (
+    mouseX > sheepSound.progress() * 200 &&
+    mouseX < sheepSound.progress() * 200 + 200 &&
+    mouseY > sheepY &&
+    mouseY < sheepY + 200
+  ) {
+    isDragging = true;
+  }
+}
+
+function mouseDragged() {
+  if (isDragging) {
+    sheepY = constrain(mouseY, 0, windowHeight - 200);
+  }
+}
+
+function mouseReleased() {
+  isDragging = false;
 }
 
 // map keys to sounds
