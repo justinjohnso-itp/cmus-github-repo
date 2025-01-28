@@ -36,6 +36,7 @@ function draw() {
 
   // Sheep
   image(sheepImage, sheepSound.progress() * 200, windowHeight - 250, 200, 200);
+  sheepImage.hide();
   console.log(sheepSound.progress()); // 0.0 - 1.0
 
   // Draw circle with scaling
