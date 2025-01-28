@@ -41,25 +41,25 @@ function keyTyped() {
 
     if (key == "a") {
       if (drums.state == "stopped") {
-        drums.start("@1m");
+        drums.start("@4n");
       } else {
         drums.stop();
       }
     } else if (key == "s") {
       if (chords.state == "stopped") {
-        chords.start("@1m");
+        chords.start("@4n");
       } else {
         chords.stop();
       }
     } else if (key == "d") {
       if (bass.state == "stopped") {
-        bass.start("@1m");
+        bass.start("@4n");
       } else {
         bass.stop();
       }
     } else if (key == "f") {
       if (melody.state == "stopped") {
-        melody.start("@1m");
+        melody.start("@4n");
       } else {
         melody.stop();
       }
