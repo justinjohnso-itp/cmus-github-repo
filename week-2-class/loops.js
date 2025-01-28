@@ -33,27 +33,33 @@ Tone.loaded().then(function () {
 
 function keyTyped() {
   if (loaded) {
+    // set up quantization
+    if (Tone.Transport.state == "stopped") {
+      Tone.Transport.bpm.value = 121.8;
+      Tone.Transport.start();
+    }
+
     if (key == "a") {
       if (drums.state == "stopped") {
-        drums.start();
+        drums.start("@1m");
       } else {
         drums.stop();
       }
     } else if (key == "s") {
       if (chords.state == "stopped") {
-        chords.start();
+        chords.start("@1m");
       } else {
         chords.stop();
       }
     } else if (key == "d") {
       if (bass.state == "stopped") {
-        bass.start();
+        bass.start("@1m");
       } else {
         bass.stop();
       }
     } else if (key == "f") {
       if (melody.state == "stopped") {
-        melody.start();
+        melody.start("@1m");
       } else {
         melody.stop();
       }
