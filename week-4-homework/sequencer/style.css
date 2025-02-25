@@ -1,0 +1,33 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #1a1a1a;
+  color: #fff;
+  font-family: 'Arial', sans-serif;
+}
+
+canvas {
+  display: block;
+  margin: 20px auto;
+}
+
+#controls {
+  text-align: center;
+  padding: 20px;
+}
+
+#playButton {
+  background: #ff3366;
+  border: none;
+  padding: 10px 20px;
+  color: white;
+  font-size: 16px;
+  border-radius: 25px;
+  cursor: pointer;
+  margin-right: 20px;
+}
+
+#tempoSlider {
+  width: 200px;
+  margin: 0 10px;
+}
