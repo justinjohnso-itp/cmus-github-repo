@@ -7,6 +7,8 @@ let grid3 = Array(4)
   .map(() => Array(12).fill(0));
 let position4 = 0;
 let position3 = 0;
+let isMouseDown = false;
+let lastToggledCell = null;
 
 const kit = new Tone.Players({
   kick: "samples/505/kick.mp3",
@@ -22,7 +24,22 @@ function createGrid(gridElement, rows, cols, gridArray) {
       cell.className = "cell";
       cell.dataset.row = i;
       cell.dataset.col = j;
-      cell.addEventListener("click", () => toggleCell(cell, gridArray, i, j));
+
+      // Replace click event with mousedown
+      cell.addEventListener("mousedown", (e) => {
+        isMouseDown = true;
+        toggleCell(cell, gridArray, i, j);
+        lastToggledCell = cell;
+      });
+
+      // Add mouseover event
+      cell.addEventListener("mouseover", (e) => {
+        if (isMouseDown && cell !== lastToggledCell) {
+          toggleCell(cell, gridArray, i, j);
+          lastToggledCell = cell;
+        }
+      });
+
       gridElement.appendChild(cell);
     }
   }
@@ -101,6 +118,17 @@ function setupControls() {
     tempoValue.textContent = `${tempo} BPM`;
   });
 }
+
+// Add event listeners to handle mouse up
+document.addEventListener("mouseup", () => {
+  isMouseDown = false;
+  lastToggledCell = null;
+});
+
+document.addEventListener("mouseleave", () => {
+  isMouseDown = false;
+  lastToggledCell = null;
+});
 
 // Initialize the sequencer
 document.addEventListener("DOMContentLoaded", () => {
