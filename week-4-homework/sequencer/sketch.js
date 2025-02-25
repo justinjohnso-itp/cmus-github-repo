@@ -26,6 +26,15 @@ function createGrid(gridElement, rows, cols, gridArray) {
       gridElement.appendChild(cell);
     }
   }
+
+  // Add measure dividers
+  const beatsPerMeasure = cols === 16 ? 4 : 3;
+  for (let i = 1; i < cols / beatsPerMeasure; i++) {
+    const divider = document.createElement("div");
+    divider.className = "measure-divider";
+    divider.style.left = `${i * beatsPerMeasure * (cellSize + 2)}px`;
+    gridElement.appendChild(divider);
+  }
 }
 
 function toggleCell(cell, gridArray, row, col) {

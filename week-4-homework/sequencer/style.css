@@ -21,6 +21,7 @@ html, body {
   margin-bottom: 40px;
   position: relative;
   justify-content: center;
+  padding: 0 2px; /* Add padding to accommodate dividers */
 }
 
 .grid-4-4 {
@@ -60,6 +61,14 @@ html, body {
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 
+.measure-divider {
+  position: absolute;
+  width: 2px;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+}
+
 #controls {
   text-align: center;
   padding: 20px;
@@ -79,4 +88,12 @@ html, body {
 #tempoSlider {
   width: 200px;
   margin: 0 10px;
+}
+
+.title {
+  text-align: center;
+  font-size: 2.5em;
+  margin: 30px 0;
+  color: #eee;
+  text-shadow: 0 0 10px rgba(255, 51, 102, 0.3);
 }
