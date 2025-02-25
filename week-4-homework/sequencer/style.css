@@ -6,9 +6,58 @@ html, body {
   font-family: 'Arial', sans-serif;
 }
 
-canvas {
-  display: block;
+.sequencer {
+  max-width: max-content;
   margin: 20px auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.grid {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 40px;
+  position: relative;
+  justify-content: center;
+}
+
+.grid-4-4 {
+  grid-template-columns: repeat(16, 40px);
+}
+
+.grid-3-4 {
+  grid-template-columns: repeat(12, 40px);
+}
+
+.cell {
+  width: 38px;
+  height: 38px;
+  background: #333;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.cell.active {
+  transform: scale(0.95);
+}
+
+.cell.active-0 { background: #FF3366; }
+.cell.active-1 { background: #33FF57; }
+.cell.active-2 { background: #3366FF; }
+.cell.active-3 { background: #FFFF33; }
+
+.playhead {
+  position: absolute;
+  top: -10px;
+  width: 2px;
+  height: calc(100% + 20px);
+  background: rgba(255, 255, 255, 0.8);
+  transition: transform 0.1s linear;
+  pointer-events: none;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 
 #controls {

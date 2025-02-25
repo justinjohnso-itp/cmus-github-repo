@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.1.9/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.9/Tone.js"></script>
     <link rel="stylesheet" type="text/css" href="style.css">
     <meta charset="utf-8" />
@@ -12,6 +11,14 @@
       <button id="playButton">Play</button>
       <input type="range" id="tempoSlider" min="60" max="200" value="120">
       <span id="tempoValue">120 BPM</span>
+    </div>
+    <div class="sequencer">
+      <div id="grid4" class="grid grid-4-4">
+        <div class="playhead"></div>
+      </div>
+      <div id="grid3" class="grid grid-3-4">
+        <div class="playhead"></div>
+      </div>
     </div>
     <script src="sketch.js"></script>
   </body>
