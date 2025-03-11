@@ -7,7 +7,7 @@ let lastPlayedTime = 0;
 let debounceDelay = 500; // ms delay to prevent rapid triggering
 let referenceImg; // Reference image for solfege hand signs
 
-// Layout variables
+// Layout
 let leftPanelWidth = 400;
 let padding = 20;
 let confidenceDisplayHeight = 200;
