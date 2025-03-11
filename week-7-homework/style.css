@@ -31,3 +31,14 @@ h1 {
   margin: 15px 0;
   font-weight: bold;
 }
+
+.instructions {
+  margin: 10px 0;
+  color: #666;
+  font-style: italic;
+}
+
+#canvas-container {
+  position: relative;
+  margin: 0 auto;
+}

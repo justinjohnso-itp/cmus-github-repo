@@ -6,7 +6,7 @@
   <title>Solfege Hand Sign Music Player</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.26/Tone.js"></script>
-  <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
+  <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,6 +14,11 @@
   <p>Show your hand signs for Do, Re, Mi, Fa, Sol, La, Ti to play the corresponding notes</p>
   <div id="status">Loading handpose model...</div>
   <div id="current-note">Current Note: None</div>
+  <div id="canvas-container"></div>
+  <div class="instructions">
+    <p>Click anywhere to start audio. Make hand signs in front of the camera to play notes.</p>
+  </div>
+  <script src="handPoseDetection.js"></script>
   <script src="sketch.js"></script>
 </body>
 </html>

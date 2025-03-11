@@ -1,11 +1,18 @@
-let handpose;
 let video;
-let predictions = [];
+let handPredictions = []; // Renamed from 'predictions' to avoid conflict
 let synth;
 let currentNote = "None";
+let activeNote = null;
 let lastPlayedTime = 0;
 let debounceDelay = 500; // ms delay to prevent rapid triggering
-let isPlaying = false;
+let referenceImg; // Reference image for solfege hand signs
+
+// New global variables for layout
+let leftPanelWidth = 400; // Static width for left panel
+let padding = 20; // Padding for visual elements
+let confidenceDisplayHeight = 100; // Height for the confidence display
+
+// Remove the camera aspect ratio constraint variable
 
 // Solfege notes in "fixed do" starting at middle C
 const solfegeNotes = {
@@ -18,71 +25,151 @@ const solfegeNotes = {
   Ti: "B4",
 };
 
+function preload() {
+  // Load the reference image
+  referenceImg = loadImage("images/solfege-hand-signs.png");
+}
+
 function setup() {
-  createCanvas(640, 480);
+  // Create a wider static sized canvas
+  createCanvas(1600, 800); // Increased width from 1000 to 1200
+
+  // Set fixed left panel width
+  leftPanelWidth = 400;
+
+  // Initialize video without specifying dimensions to use default camera resolution
   video = createCapture(VIDEO);
-  video.size(width, height);
   video.hide();
-
-  // Initialize handpose model
-  handpose = ml5.handpose(video, modelReady);
-
-  // Listen to new hand predictions
-  handpose.on("predict", (results) => {
-    predictions = results;
-    if (predictions.length > 0) {
-      detectSolfegeSign();
-    } else {
-      // No hand detected
-      if (currentNote !== "None") {
-        currentNote = "None";
-        updateNoteDisplay();
-      }
-    }
-  });
 
   // Initialize the synthesizer
   synth = new Tone.PolySynth(Tone.Synth).toDestination();
+
+  // Initialize handpose detection using the module
+  handPoseDetection.init(
+    video,
+    // Model ready callback
+    () => {
+      select("#status").html("Model loaded, show your hand signs!");
+    },
+    // Detection callback
+    (detectedNote, results) => {
+      // Store predictions for drawing
+      handPredictions = results || []; // Use handPredictions instead of predictions
+
+      // Handle note detection
+      if (detectedNote !== null && detectedNote !== currentNote) {
+        const now = millis();
+        if (now - lastPlayedTime > debounceDelay) {
+          // Stop any currently playing note
+          if (activeNote !== null) {
+            stopCurrentNote();
+          }
+
+          // Update current note and play it
+          currentNote = detectedNote;
+          updateNoteDisplay();
+          playNote(solfegeNotes[currentNote]);
+          lastPlayedTime = now;
+        }
+      } else if (detectedNote === null && currentNote !== "None") {
+        // No hand detected, reset current note
+        currentNote = "None";
+        updateNoteDisplay();
+        if (activeNote !== null) {
+          stopCurrentNote();
+        }
+      }
+    }
+  );
 }
 
-function modelReady() {
-  select("#status").html("Model loaded, show your hand signs!");
-}
+// Remove the updateLayoutDimensions function since we're using static sizing
+
+// Remove the windowResized function since we're using static sizing
 
 function draw() {
-  // Flip the image horizontally for a mirror effect
+  background(220);
+
+  // Draw video feed on the right side
   push();
   translate(width, 0);
   scale(-1, 1);
-  image(video, 0, 0, width, height);
 
-  // Draw keypoints and skeletons
-  drawKeypoints();
-  pop();
+  // Display video using the available right panel space
+  const videoWidth = width - leftPanelWidth; // Now 800px instead of 600px
 
-  // Add instructions
-  fill(255);
+  // Display video - let it scale to fit the right panel width
+  // while maintaining its natural aspect ratio
+  image(video, 0, 0, videoWidth, height);
+
+  // Draw hand keypoints and connectors if hand is detected
+  if (handPredictions.length > 0) {
+    drawKeypoints();
+    drawConnectors();
+  }
+  pop(); // Always reset transform, regardless of predictions
+
+  // Draw dividing line
+  stroke(180);
+  strokeWeight(2);
+  line(leftPanelWidth, 0, leftPanelWidth, height);
   noStroke();
-  rect(0, 0, width, 30);
-  fill(0);
-  textSize(16);
-  text("Show solfege hand signs: Do, Re, Mi, Fa, Sol, La, Ti", 10, 20);
+
+  // Draw confidence bars at the top of the left panel with more padding
+  drawConfidenceBars();
+
+  // Draw reference image below confidence bars - adjusted for static sizing
+  if (referenceImg) {
+    // Calculate available space
+    const availableHeight = height - confidenceDisplayHeight - padding * 3;
+    const availableWidth = leftPanelWidth - padding * 2;
+
+    // Get the aspect ratio of the reference image
+    const imgAspect = referenceImg.width / referenceImg.height;
+
+    // Calculate dimensions that fit the available space while maintaining aspect ratio
+    let imgWidth, imgHeight;
+
+    if (availableWidth / availableHeight > imgAspect) {
+      // Available space is wider than image aspect ratio - constrain by height
+      imgHeight = availableHeight;
+      imgWidth = imgHeight * imgAspect;
+    } else {
+      // Available space is taller than image aspect ratio - constrain by width
+      imgWidth = availableWidth;
+      imgHeight = imgWidth / imgAspect;
+    }
+
+    // Center the image horizontally within the left panel
+    const imgX = (leftPanelWidth - imgWidth) / 2;
+    const imgY = confidenceDisplayHeight + padding * 2;
+
+    image(referenceImg, imgX, imgY, imgWidth, imgHeight);
+  }
 }
 
-// Draw hand skeleton and landmarks
 function drawKeypoints() {
-  if (predictions.length > 0) {
-    const hand = predictions[0];
+  if (handPredictions.length > 0) {
+    // Update references
+    const hand = handPredictions[0];
 
     // Draw hand landmarks
     for (let i = 0; i < hand.landmarks.length; i++) {
       const keypoint = hand.landmarks[i];
       fill(0, 255, 0);
       noStroke();
-      ellipse(keypoint[0], keypoint[1], 10, 10);
+      ellipse(keypoint[0], keypoint[1], 8, 8);
     }
+  }
+}
 
-    // Draw hand skeleton
+function drawConnectors() {
+  if (handPredictions.length > 0) {
+    // Update references
+    const hand = handPredictions[0];
+    const landmarks = hand.landmarks;
+
+    // Draw lines connecting landmarks
     stroke(0, 255, 0);
     strokeWeight(2);
 
@@ -105,156 +192,103 @@ function drawKeypoints() {
   }
 }
 
-function detectSolfegeSign() {
-  if (predictions.length === 0) return;
+function drawConfidenceBars() {
+  const numNotes = Object.keys(handPoseDetection.signConfidences).length;
+  const maxBarHeight = confidenceDisplayHeight - padding * 2;
 
-  const hand = predictions[0];
-  const landmarks = hand.landmarks;
-  const annotations = hand.annotations;
+  // Calculate bar sizes based on available width
+  const totalBarSpace = leftPanelWidth - padding * 2;
+  const barWidth = (totalBarSpace - (numNotes - 1) * (padding / 2)) / numNotes;
 
-  // Extract finger tips and other useful landmarks
-  const thumbTip = annotations.thumb[3];
-  const indexTip = annotations.indexFinger[3];
-  const middleTip = annotations.middleFinger[3];
-  const ringTip = annotations.ringFinger[3];
-  const pinkyTip = annotations.pinky[3];
+  // Top position for confidence display
+  const startY = padding + maxBarHeight;
+  const startX = padding;
 
-  // Extract palm base positions for reference
-  const palmBase = landmarks[0]; // wrist point
+  // Draw background panel
+  fill(40, 40, 40, 200);
+  rect(0, 0, leftPanelWidth, confidenceDisplayHeight + padding);
 
-  // Detect signs based on finger positions
-  let detectedNote = detectSign(
-    thumbTip,
-    indexTip,
-    middleTip,
-    ringTip,
-    pinkyTip,
-    palmBase,
-    annotations
+  // Draw title
+  fill(255);
+  textSize(16);
+  textAlign(LEFT, TOP);
+  text("Solfege Sign Confidence", startX, padding);
+
+  // Add threshold line label
+  textAlign(RIGHT);
+  textSize(12);
+  text(
+    "70% threshold",
+    startX + totalBarSpace - 5,
+    startY - maxBarHeight * 0.7 - 15
   );
 
-  // Update and play note if changed
-  if (detectedNote && detectedNote !== currentNote) {
-    const now = millis();
-    if (now - lastPlayedTime > debounceDelay) {
-      currentNote = detectedNote;
-      updateNoteDisplay();
-      playNote(solfegeNotes[currentNote]);
-      lastPlayedTime = now;
+  // Draw bars
+  let x = startX;
+  for (const [sign, confidence] of Object.entries(
+    handPoseDetection.signConfidences
+  )) {
+    // Bar background
+    fill(80);
+    rect(x, startY - maxBarHeight, barWidth, maxBarHeight);
+
+    // Bar fill
+    const barHeight = confidence * maxBarHeight;
+
+    // Color based on if it's the current note
+    if (sign === currentNote) {
+      fill(50, 255, 50); // Brighter green for current note
+    } else {
+      // Color based on confidence
+      const r = map(confidence, 0, 1, 100, 220);
+      const g = map(confidence, 0, 1, 100, 220);
+      const b = 100;
+      fill(r, g, b, 220);
     }
-  }
-}
 
-function detectSign(
-  thumbTip,
-  indexTip,
-  middleTip,
-  ringTip,
-  pinkyTip,
-  palmBase,
-  annotations
-) {
-  // Helper function to calculate distance between two points
-  const distance = (a, b) =>
-    Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2));
+    rect(x, startY - barHeight, barWidth, barHeight);
 
-  // Helper function to check if a finger is extended
-  // Using y-coordinate comparison (lower value is higher on screen)
-  const isFingerExtended = (fingerTip, mcp, threshold = 50) => {
-    return mcp[1] - fingerTip[1] > threshold;
-  };
+    // Label
+    textAlign(CENTER);
 
-  // Get MCP joints (where fingers connect to palm)
-  const indexMCP = annotations.indexFinger[0];
-  const middleMCP = annotations.middleFinger[0];
-  const ringMCP = annotations.ringFinger[0];
-  const pinkyMCP = annotations.pinky[0];
+    // Note label shadow for better readability
+    fill(0, 0, 0, 160);
+    text(sign, x + barWidth / 2 + 1, startY - maxBarHeight - 4 + 1);
 
-  // Check for extended fingers
-  const thumbExtended = isFingerExtended(thumbTip, palmBase, 30);
-  const indexExtended = isFingerExtended(indexTip, indexMCP);
-  const middleExtended = isFingerExtended(middleTip, middleMCP);
-  const ringExtended = isFingerExtended(ringTip, ringMCP);
-  const pinkyExtended = isFingerExtended(pinkyTip, pinkyMCP);
+    // Note label
+    fill(255);
+    textSize(14);
+    text(sign, x + barWidth / 2, startY - maxBarHeight - 4);
 
-  // Check for thumb and index touching
-  const thumbIndexTouch = distance(thumbTip, indexTip) < 30;
-  const thumbMiddleTouch = distance(thumbTip, middleTip) < 30;
-  const thumbRingTouch = distance(thumbTip, ringTip) < 30;
-  const thumbPinkyTouch = distance(thumbTip, pinkyTip) < 30;
+    // Confidence percentage
+    if (confidence > 0.05) {
+      textSize(12);
+      const percentText = Math.round(confidence * 100) + "%";
 
-  // Do (C): Closed fist with thumb extended
-  if (
-    thumbExtended &&
-    !indexExtended &&
-    !middleExtended &&
-    !ringExtended &&
-    !pinkyExtended
-  ) {
-    return "Do";
+      // Position the text inside the bar if tall enough, otherwise above it
+      const textY =
+        barHeight > 20 ? startY - barHeight + 14 : startY - maxBarHeight - 20;
+
+      // Text shadow
+      fill(0, 0, 0, 160);
+      text(percentText, x + barWidth / 2 + 1, textY + 1);
+
+      fill(255);
+      text(percentText, x + barWidth / 2, textY);
+    }
+
+    x += barWidth + padding / 2;
   }
 
-  // Re (D): Index finger extended, others folded
-  if (
-    !thumbExtended &&
-    indexExtended &&
-    !middleExtended &&
-    !ringExtended &&
-    !pinkyExtended
-  ) {
-    return "Re";
-  }
+  // Draw threshold indicator (at 0.7 confidence)
+  stroke(255, 0, 0);
+  strokeWeight(2);
+  const thresholdY = startY - maxBarHeight * 0.7;
+  line(startX, thresholdY, startX + totalBarSpace, thresholdY);
 
-  // Mi (E): Index and middle fingers extended (peace sign)
-  if (
-    !thumbExtended &&
-    indexExtended &&
-    middleExtended &&
-    !ringExtended &&
-    !pinkyExtended
-  ) {
-    return "Mi";
-  }
-
-  // Fa (F): Index, middle, and ring fingers extended
-  if (
-    !thumbExtended &&
-    indexExtended &&
-    middleExtended &&
-    ringExtended &&
-    !pinkyExtended
-  ) {
-    return "Fa";
-  }
-
-  // Sol (G): All fingers extended (open hand)
-  if (
-    thumbExtended &&
-    indexExtended &&
-    middleExtended &&
-    ringExtended &&
-    pinkyExtended
-  ) {
-    return "Sol";
-  }
-
-  // La (A): Thumb and pinky extended (hang loose/shaka sign)
-  if (
-    thumbExtended &&
-    !indexExtended &&
-    !middleExtended &&
-    !ringExtended &&
-    pinkyExtended
-  ) {
-    return "La";
-  }
-
-  // Ti (B): Thumb touching pinky, other fingers extended
-  if (thumbPinkyTouch && indexExtended && middleExtended && ringExtended) {
-    return "Ti";
-  }
-
-  return null;
+  // Reset text alignment
+  textAlign(LEFT);
+  noStroke();
 }
 
 function playNote(note) {
@@ -275,5 +309,28 @@ function updateNoteDisplay() {
 function mousePressed() {
   if (Tone.context.state !== "running") {
     Tone.start();
+  }
+}
+
+function startSustainedNote(note) {
+  // Initialize Tone.js context if it's suspended
+  if (Tone.context.state !== "running") {
+    Tone.start();
+  }
+
+  // Stop any currently playing note
+  if (activeNote !== null) {
+    synth.triggerRelease(activeNote);
+  }
+
+  // Start the new note
+  synth.triggerAttack(note);
+  activeNote = note;
+}
+
+function stopCurrentNote() {
+  if (activeNote !== null) {
+    synth.triggerRelease(activeNote);
+    activeNote = null;
   }
 }
