@@ -88,7 +88,7 @@ function setup() {
             }
           }
 
-          // Handle note detection and playback
+          // Handle note detection and playback - UPDATED FOR SUSTAINED NOTES
           if (detectedNote !== null && detectedNote !== currentNote) {
             const now = millis();
             if (now - lastPlayedTime > debounceDelay) {
@@ -96,7 +96,7 @@ function setup() {
                 stopCurrentNote();
               }
               currentNote = detectedNote;
-              playNote(solfegeNotes[currentNote]);
+              startSustainedNote(solfegeNotes[currentNote]); // Changed to sustained notes
               lastPlayedTime = now;
             }
           } else if (detectedNote === null && currentNote !== "None") {
@@ -400,14 +400,15 @@ function drawConnectors() {
   }
 }
 
+// Modify the playNote function to be a wrapper for startSustainedNote
 function playNote(note) {
   // Initialize Tone.js context if needed
   if (Tone.context.state !== "running") {
     Tone.start();
   }
 
-  // Play note
-  synth.triggerAttackRelease(note, "8n");
+  // Use sustained notes instead of short notes
+  startSustainedNote(note);
 }
 
 function mousePressed() {
