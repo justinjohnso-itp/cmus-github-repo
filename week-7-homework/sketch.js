@@ -10,7 +10,7 @@ let referenceImg; // Reference image for solfege hand signs
 // New global variables for layout
 let leftPanelWidth = 400; // Static width for left panel
 let padding = 20; // Padding for visual elements
-let confidenceDisplayHeight = 100; // Height for the confidence display
+let confidenceDisplayHeight = 200; // Height for the confidence display (increased by 100px)
 
 // Remove the camera aspect ratio constraint variable
 
@@ -40,7 +40,7 @@ function preload() {
 
 function setup() {
   // Create a static sized canvas matching our video dimensions
-  createCanvas(1280, 720);
+  createCanvas(1280, 720); // Reverted to original height
 
   // Set fixed left panel width
   leftPanelWidth = 400;
@@ -65,7 +65,7 @@ function setup() {
       // Detection callback
       (detectedNote, results) => {
         handPredictions = results || [];
-        
+
         if (isCalibrationMode && handPredictions.length > 0) {
           // Send landmarks to calibration system
           collectSample(handPredictions[0].landmarks);
@@ -102,13 +102,11 @@ function setup() {
                 stopCurrentNote();
               }
               currentNote = detectedNote;
-              updateNoteDisplay();
               playNote(solfegeNotes[currentNote]);
               lastPlayedTime = now;
             }
           } else if (detectedNote === null && currentNote !== "None") {
             currentNote = "None";
-            updateNoteDisplay();
             if (activeNote !== null) {
               stopCurrentNote();
             }
@@ -120,14 +118,17 @@ function setup() {
 
   // Add calibration setup
   setupCalibration();
-  
-  // Add calibration toggle button
-  createButton('Toggle Calibration Mode')
-    .position(20, height - 40)
-    .mousePressed(() => {
-      isCalibrationMode = !isCalibrationMode;
-      select('#calibration-ui').style('display', isCalibrationMode ? 'block' : 'none');
-    });
+
+  // Add calibration toggle button (moved below canvas)
+  const toggleBtn = createButton("Toggle Calibration Mode");
+  toggleBtn.position(width / 2 - 100, height + 30);
+  toggleBtn.mousePressed(() => {
+    isCalibrationMode = !isCalibrationMode;
+    select("#calibration-ui").style(
+      "display",
+      isCalibrationMode ? "block" : "none"
+    );
+  });
 }
 
 // Remove the updateLayoutDimensions function since we're using static sizing
@@ -137,62 +138,171 @@ function setup() {
 function draw() {
   background(220);
 
-  // Draw dividing line
-  stroke(180);
-  strokeWeight(2);
-  line(leftPanelWidth, 0, leftPanelWidth, height);
-  noStroke();
-
-  // Draw confidence bars at the top of the left panel
+  // Draw confidence bars at the top of the screen
   drawConfidenceBars();
 
-  // Draw reference image below confidence bars
-  if (referenceImg) {
-    // Calculate available space
-    const availableHeight = height - confidenceDisplayHeight - padding * 3;
-    const availableWidth = leftPanelWidth - padding * 2;
+  // Draw dividing line between panels
+  stroke(180);
+  strokeWeight(2);
+  line(leftPanelWidth, confidenceDisplayHeight, leftPanelWidth, height);
+  noStroke();
 
-    // Calculate dimensions while maintaining aspect ratio
-    let imgWidth, imgHeight;
+  // Draw reference image in the left panel
+  drawReferenceImage();
 
-    if (
-      availableWidth / availableHeight >
-      referenceImg.width / referenceImg.height
-    ) {
-      imgHeight = availableHeight;
-      imgWidth = imgHeight * (referenceImg.width / referenceImg.height);
-    } else {
-      imgWidth = availableWidth;
-      imgHeight = imgWidth / (referenceImg.width / referenceImg.height);
-    }
-
-    // Center the image horizontally within the left panel
-    const imgX = (leftPanelWidth - imgWidth) / 2;
-    const imgY = confidenceDisplayHeight + padding * 2;
-
-    image(referenceImg, imgX, imgY, imgWidth, imgHeight);
-  }
-
-  // Draw video feed on the right side using simple approach
-  const videoX = leftPanelWidth + 20; // Add some padding from the divider
-  const videoY = 20; // Add some padding from the top
+  // Draw video feed on the right side
+  const videoX = leftPanelWidth + 20; // Position to the right of left panel
+  const videoY = confidenceDisplayHeight + 20; // Position below confidence display
 
   push();
   // Flip the video horizontally so it's like a mirror
   translate(videoX + video.width, videoY);
   scale(-1, 1);
   image(video, 0, 0);
-  pop();
 
   // Draw hand visualization directly over the video
   if (handPredictions.length > 0) {
-    push();
-    translate(videoX + video.width, videoY);
-    scale(-1, 1);
     drawConnectors();
     drawKeypoints();
-    pop();
+    drawHandMesh();
   }
+  pop();
+}
+
+// Separate function to draw reference image for cleaner code
+function drawReferenceImage() {
+  if (referenceImg) {
+    // Calculate available space within left panel
+    const availableWidth = leftPanelWidth - padding * 2;
+    const availableHeight = height - confidenceDisplayHeight - padding * 5;
+
+    // Calculate dimensions for image maintaining aspect ratio
+    const imgAspect = referenceImg.width / referenceImg.height;
+    let imgWidth, imgHeight;
+
+    if (availableWidth / availableHeight > imgAspect) {
+      imgHeight = availableHeight;
+      imgWidth = imgHeight * imgAspect;
+    } else {
+      imgWidth = availableWidth;
+      imgHeight = imgWidth / imgAspect;
+    }
+
+    // Center the image in the left panel
+    const imgX = (leftPanelWidth - imgWidth) / 2;
+    const imgY =
+      confidenceDisplayHeight + (availableHeight - imgHeight) / 2 + padding * 3;
+
+    // Draw the reference image with a subtle border
+    stroke(180);
+    strokeWeight(1);
+    fill(255);
+    rect(imgX - 5, imgY - 5, imgWidth + 10, imgHeight + 10, 5);
+    noStroke();
+
+    image(referenceImg, imgX, imgY, imgWidth, imgHeight);
+
+    // Add a title above the reference image
+    fill(40);
+    textAlign(CENTER);
+    textSize(18);
+    text("Solfege Hand Sign Reference", leftPanelWidth / 2, imgY - padding * 2);
+    textAlign(LEFT);
+  }
+}
+
+function drawConfidenceBars() {
+  const numNotes = Object.keys(handPoseDetection.signConfidences).length;
+  const maxBarHeight = 120; // Increased height for bars (was 80)
+
+  // Calculate bar sizes based on available width
+  const barAreaWidth = width - padding * 2;
+  const barWidth = (barAreaWidth - (numNotes - 1) * padding) / numNotes;
+
+  // Top position for confidence display
+  const startY = padding * 2.5 + maxBarHeight;
+  const startX = padding;
+
+  // Draw background panel
+  fill(120, 120, 120, 200);
+  rect(0, 0, width, confidenceDisplayHeight, 0, 0, 10, 10); // Rounded bottom corners
+
+  // Draw title
+  fill(255);
+  textSize(18);
+  textAlign(CENTER, TOP);
+  text("Solfege Sign Confidence", width / 2, padding / 2);
+
+  // Draw threshold indicator across all bars
+  stroke(255, 0, 0, 150);
+  strokeWeight(1);
+  const thresholdY = startY - maxBarHeight * 0.7;
+  line(startX, thresholdY, width - padding, thresholdY);
+
+  // Add threshold label
+  textSize(10);
+  fill(255, 200);
+  textAlign(RIGHT);
+  text("70% threshold", width - padding - 5, thresholdY - 5);
+
+  // Draw bars
+  let x = startX;
+  for (const [sign, confidence] of Object.entries(
+    handPoseDetection.signConfidences
+  )) {
+    // Bar background
+    fill(80);
+    rect(x, startY - maxBarHeight, barWidth, maxBarHeight, 3); // Rounded corners
+
+    // Bar fill
+    const barHeight = confidence * maxBarHeight;
+
+    // Color based on if it's the current note
+    if (sign === currentNote) {
+      fill(50, 255, 100); // Brighter green for current note
+    } else {
+      // Color based on confidence
+      const r = map(confidence, 0, 1, 100, 220);
+      const g = map(confidence, 0, 1, 100, 220);
+      const b = 100;
+      fill(r, g, b, 220);
+    }
+
+    rect(x, startY - barHeight, barWidth, barHeight, 3); // Rounded corners
+
+    // Note label
+    textAlign(CENTER);
+
+    // Note label with better contrast
+    fill(255);
+    textSize(16);
+    text(sign, x + barWidth / 2, startY - maxBarHeight - 5);
+
+    // Confidence percentage
+    if (confidence > 0.05) {
+      textSize(14);
+      const percentText = Math.round(confidence * 100) + "%";
+
+      // Position the text inside or above the bar
+      const textY =
+        barHeight > 25 ? startY - barHeight + 15 : startY - maxBarHeight - 25;
+
+      // Text with contrast enhancement
+      if (barHeight <= 25) {
+        fill(0, 0, 0, 50);
+        rect(x + 2, textY - 12, barWidth - 4, 20, 5);
+      }
+
+      fill(255);
+      text(percentText, x + barWidth / 2, textY);
+    }
+
+    x += barWidth + padding;
+  }
+
+  // Reset text alignment
+  textAlign(LEFT);
+  noStroke();
 }
 
 function drawKeypoints() {
@@ -296,105 +406,6 @@ function drawConnectors() {
   }
 }
 
-function drawConfidenceBars() {
-  const numNotes = Object.keys(handPoseDetection.signConfidences).length;
-  const maxBarHeight = confidenceDisplayHeight - padding * 2;
-
-  // Calculate bar sizes based on available width
-  const totalBarSpace = leftPanelWidth - padding * 2;
-  const barWidth = (totalBarSpace - (numNotes - 1) * (padding / 2)) / numNotes;
-
-  // Top position for confidence display
-  const startY = padding + maxBarHeight;
-  const startX = padding;
-
-  // Draw background panel
-  fill(40, 40, 40, 200);
-  rect(0, 0, leftPanelWidth, confidenceDisplayHeight + padding);
-
-  // Draw title
-  fill(255);
-  textSize(16);
-  textAlign(LEFT, TOP);
-  text("Solfege Sign Confidence", startX, padding);
-
-  // Add threshold line label
-  textAlign(RIGHT);
-  textSize(12);
-  text(
-    "70% threshold",
-    startX + totalBarSpace - 5,
-    startY - maxBarHeight * 0.7 - 15
-  );
-
-  // Draw bars
-  let x = startX;
-  for (const [sign, confidence] of Object.entries(
-    handPoseDetection.signConfidences
-  )) {
-    // Bar background
-    fill(80);
-    rect(x, startY - maxBarHeight, barWidth, maxBarHeight);
-
-    // Bar fill
-    const barHeight = confidence * maxBarHeight;
-
-    // Color based on if it's the current note
-    if (sign === currentNote) {
-      fill(50, 255, 50); // Brighter green for current note
-    } else {
-      // Color based on confidence
-      const r = map(confidence, 0, 1, 100, 220);
-      const g = map(confidence, 0, 1, 100, 220);
-      const b = 100;
-      fill(r, g, b, 220);
-    }
-
-    rect(x, startY - barHeight, barWidth, barHeight);
-
-    // Label
-    textAlign(CENTER);
-
-    // Note label shadow for better readability
-    fill(0, 0, 0, 160);
-    text(sign, x + barWidth / 2 + 1, startY - maxBarHeight - 4 + 1);
-
-    // Note label
-    fill(255);
-    textSize(14);
-    text(sign, x + barWidth / 2, startY - maxBarHeight - 4);
-
-    // Confidence percentage
-    if (confidence > 0.05) {
-      textSize(12);
-      const percentText = Math.round(confidence * 100) + "%";
-
-      // Position the text inside the bar if tall enough, otherwise above it
-      const textY =
-        barHeight > 20 ? startY - barHeight + 14 : startY - maxBarHeight - 20;
-
-      // Text shadow
-      fill(0, 0, 0, 160);
-      text(percentText, x + barWidth / 2 + 1, textY + 1);
-
-      fill(255);
-      text(percentText, x + barWidth / 2, textY);
-    }
-
-    x += barWidth + padding / 2;
-  }
-
-  // Draw threshold indicator (at 0.7 confidence)
-  stroke(255, 0, 0);
-  strokeWeight(2);
-  const thresholdY = startY - maxBarHeight * 0.7;
-  line(startX, thresholdY, startX + totalBarSpace, thresholdY);
-
-  // Reset text alignment
-  textAlign(LEFT);
-  noStroke();
-}
-
 function playNote(note) {
   // Initialize Tone.js context if it's suspended
   if (Tone.context.state !== "running") {
@@ -403,10 +414,6 @@ function playNote(note) {
 
   // Play note with synth
   synth.triggerAttackRelease(note, "8n");
-}
-
-function updateNoteDisplay() {
-  select("#current-note").html(`Current Note: ${currentNote}`);
 }
 
 // Handle mouse press to initialize audio context
