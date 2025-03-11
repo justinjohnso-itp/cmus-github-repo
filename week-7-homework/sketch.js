@@ -40,7 +40,7 @@ function preload() {
 
 function setup() {
   // Create a static sized canvas matching our video dimensions
-  createCanvas(1280, 720); // Reverted to original height
+  createCanvas(1080, 720); // Reduced width from 1280 to 1080 (200px narrower)
 
   // Set fixed left panel width
   leftPanelWidth = 400;
@@ -119,9 +119,9 @@ function setup() {
   // Add calibration setup
   setupCalibration();
 
-  // Add calibration toggle button (moved below canvas)
+  // Add calibration toggle button (centered and 20px below canvas)
   const toggleBtn = createButton("Toggle Calibration Mode");
-  toggleBtn.position(width / 2 - 100, height + 30);
+  toggleBtn.position((windowWidth - toggleBtn.width) / 2, height + 200);
   toggleBtn.mousePressed(() => {
     isCalibrationMode = !isCalibrationMode;
     select("#calibration-ui").style(
@@ -129,6 +129,21 @@ function setup() {
       isCalibrationMode ? "block" : "none"
     );
   });
+
+  // Place calibration UI below button
+  positionCalibrationUI();
+}
+
+// Function to position calibration UI below toggle button
+function positionCalibrationUI() {
+  const toggleBtn = select("button");
+  if (toggleBtn && select("#calibration-ui")) {
+    const buttonHeight = 38; // Approximate button height
+    select("#calibration-ui").style(
+      "top",
+      height + 20 + buttonHeight + 200 + "px"
+    ); // 20px below button
+  }
 }
 
 // Remove the updateLayoutDimensions function since we're using static sizing

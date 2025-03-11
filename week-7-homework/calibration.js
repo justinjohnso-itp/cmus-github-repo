@@ -33,9 +33,10 @@ function setupCalibration() {
 function createCalibrationUI() {
   const container = createElement("div");
   container.id("calibration-ui");
-  // Position below canvas
+
+  // Initial positioning - will be updated from sketch.js
   container.style("position", "absolute");
-  container.style("top", height + 70 + "px"); // Position below canvas and toggle button
+  container.style("top", "0");
   container.style("left", "50%");
   container.style("transform", "translateX(-50%)"); // Center horizontally
   container.style("background", "rgba(0,0,0,0.8)");
