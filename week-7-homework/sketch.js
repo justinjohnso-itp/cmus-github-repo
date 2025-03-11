@@ -25,20 +25,26 @@ const solfegeNotes = {
   Ti: "B4",
 };
 
+// Add smoothing variables for the keypoints
+let smoothedLandmarks = [];
+const smoothingFactor = 0.7; // Higher = more smoothing, range 0-1
+let isFirstPrediction = true;
+
 function preload() {
   // Load the reference image
   referenceImg = loadImage("images/solfege-hand-signs.png");
 }
 
 function setup() {
-  // Create a wider static sized canvas
-  createCanvas(1600, 800); // Increased width from 1000 to 1200
+  // Create a static sized canvas matching our video dimensions
+  createCanvas(1280, 720);
 
   // Set fixed left panel width
   leftPanelWidth = 400;
 
-  // Initialize video without specifying dimensions to use default camera resolution
+  // Initialize video with standard dimensions
   video = createCapture(VIDEO);
+  video.size(640, 480);
   video.hide();
 
   // Initialize the synthesizer
@@ -54,7 +60,35 @@ function setup() {
     // Detection callback
     (detectedNote, results) => {
       // Store predictions for drawing
-      handPredictions = results || []; // Use handPredictions instead of predictions
+      handPredictions = results || [];
+
+      // Apply smoothing to landmarks if predictions exist
+      if (handPredictions.length > 0) {
+        const currentLandmarks = handPredictions[0].landmarks;
+
+        // Initialize smoothed landmarks on first prediction
+        if (isFirstPrediction || smoothedLandmarks.length === 0) {
+          smoothedLandmarks = [...currentLandmarks];
+          isFirstPrediction = false;
+        } else {
+          // Apply exponential smoothing to each landmark
+          for (let i = 0; i < currentLandmarks.length; i++) {
+            if (!smoothedLandmarks[i]) {
+              smoothedLandmarks[i] = [...currentLandmarks[i]];
+            } else {
+              for (let j = 0; j < 3; j++) {
+                smoothedLandmarks[i][j] =
+                  smoothedLandmarks[i][j] * smoothingFactor +
+                  currentLandmarks[i][j] * (1 - smoothingFactor);
+              }
+            }
+          }
+        }
+      } else {
+        // Reset smoothing when no hand is detected
+        smoothedLandmarks = [];
+        isFirstPrediction = true;
+      }
 
       // Handle note detection
       if (detectedNote !== null && detectedNote !== currentNote) {
@@ -90,54 +124,33 @@ function setup() {
 function draw() {
   background(220);
 
-  // Draw video feed on the right side
-  push();
-  translate(width, 0);
-  scale(-1, 1);
-
-  // Display video using the available right panel space
-  const videoWidth = width - leftPanelWidth; // Now 800px instead of 600px
-
-  // Display video - let it scale to fit the right panel width
-  // while maintaining its natural aspect ratio
-  image(video, 0, 0, videoWidth, height);
-
-  // Draw hand keypoints and connectors if hand is detected
-  if (handPredictions.length > 0) {
-    drawKeypoints();
-    drawConnectors();
-  }
-  pop(); // Always reset transform, regardless of predictions
-
   // Draw dividing line
   stroke(180);
   strokeWeight(2);
   line(leftPanelWidth, 0, leftPanelWidth, height);
   noStroke();
 
-  // Draw confidence bars at the top of the left panel with more padding
+  // Draw confidence bars at the top of the left panel
   drawConfidenceBars();
 
-  // Draw reference image below confidence bars - adjusted for static sizing
+  // Draw reference image below confidence bars
   if (referenceImg) {
     // Calculate available space
     const availableHeight = height - confidenceDisplayHeight - padding * 3;
     const availableWidth = leftPanelWidth - padding * 2;
 
-    // Get the aspect ratio of the reference image
-    const imgAspect = referenceImg.width / referenceImg.height;
-
-    // Calculate dimensions that fit the available space while maintaining aspect ratio
+    // Calculate dimensions while maintaining aspect ratio
     let imgWidth, imgHeight;
 
-    if (availableWidth / availableHeight > imgAspect) {
-      // Available space is wider than image aspect ratio - constrain by height
+    if (
+      availableWidth / availableHeight >
+      referenceImg.width / referenceImg.height
+    ) {
       imgHeight = availableHeight;
-      imgWidth = imgHeight * imgAspect;
+      imgWidth = imgHeight * (referenceImg.width / referenceImg.height);
     } else {
-      // Available space is taller than image aspect ratio - constrain by width
       imgWidth = availableWidth;
-      imgHeight = imgWidth / imgAspect;
+      imgHeight = imgWidth / (referenceImg.width / referenceImg.height);
     }
 
     // Center the image horizontally within the left panel
@@ -146,47 +159,125 @@ function draw() {
 
     image(referenceImg, imgX, imgY, imgWidth, imgHeight);
   }
+
+  // Draw video feed on the right side using simple approach
+  const videoX = leftPanelWidth + 20; // Add some padding from the divider
+  const videoY = 20; // Add some padding from the top
+
+  push();
+  // Flip the video horizontally so it's like a mirror
+  translate(videoX + video.width, videoY);
+  scale(-1, 1);
+  image(video, 0, 0);
+  pop();
+
+  // Draw hand visualization directly over the video
+  if (handPredictions.length > 0) {
+    push();
+    translate(videoX + video.width, videoY);
+    scale(-1, 1);
+    drawConnectors();
+    drawKeypoints();
+    pop();
+  }
 }
 
 function drawKeypoints() {
-  if (handPredictions.length > 0) {
-    // Update references
-    const hand = handPredictions[0];
+  if (handPredictions.length > 0 && smoothedLandmarks.length > 0) {
+    // Enhanced drawing - larger points at key landmark positions
+    const keyLandmarks = [0, 4, 8, 12, 16, 20]; // Wrist and fingertips
 
-    // Draw hand landmarks
-    for (let i = 0; i < hand.landmarks.length; i++) {
-      const keypoint = hand.landmarks[i];
-      fill(0, 255, 0);
-      noStroke();
-      ellipse(keypoint[0], keypoint[1], 8, 8);
+    // Draw finger connections with thicker lines for better visibility
+    drawConnectors();
+
+    // Draw landmarks with varying sizes
+    for (let i = 0; i < smoothedLandmarks.length; i++) {
+      const keypoint = smoothedLandmarks[i];
+
+      // Different visualization for key landmarks
+      if (keyLandmarks.includes(i)) {
+        // Fingertips and wrist get larger circles
+        noStroke();
+        fill(0, 255, 0, 200);
+        ellipse(keypoint[0], keypoint[1], 14, 14);
+
+        // Add highlight effect
+        fill(255, 255, 255, 150);
+        ellipse(keypoint[0], keypoint[1], 8, 8);
+      } else {
+        // Other landmarks get smaller circles
+        noStroke();
+        fill(0, 255, 0, 150);
+        ellipse(keypoint[0], keypoint[1], 8, 8);
+      }
     }
   }
 }
 
 function drawConnectors() {
-  if (handPredictions.length > 0) {
-    // Update references
-    const hand = handPredictions[0];
-    const landmarks = hand.landmarks;
+  if (handPredictions.length > 0 && smoothedLandmarks.length > 0) {
+    // Using landmark connections as defined by MediaPipe hand tracking
 
-    // Draw lines connecting landmarks
-    stroke(0, 255, 0);
-    strokeWeight(2);
+    // Palm connections
+    const palmIndices = [
+      [0, 1],
+      [0, 5],
+      [0, 17],
+      [1, 2],
+      [2, 3],
+      [3, 4],
+    ];
 
-    // Draw thumb connections
-    for (let i = 1; i < 5; i++) {
-      const a = hand.landmarks[i - 1];
-      const b = hand.landmarks[i];
-      line(a[0], a[1], b[0], b[1]);
+    // Finger connections
+    const fingerIndices = [
+      // Thumb
+      [1, 5],
+      [5, 6],
+      [6, 7],
+      [7, 8],
+      // Index
+      [5, 9],
+      [9, 10],
+      [10, 11],
+      [11, 12],
+      // Middle
+      [9, 13],
+      [13, 14],
+      [14, 15],
+      [15, 16],
+      // Ring
+      [13, 17],
+      [17, 18],
+      [18, 19],
+      [19, 20],
+      // Pinky
+      [17, 0],
+    ];
+
+    // Draw palm mesh with thicker lines
+    stroke(0, 255, 0, 220);
+    strokeWeight(3);
+    for (const [i, j] of palmIndices) {
+      if (smoothedLandmarks[i] && smoothedLandmarks[j]) {
+        line(
+          smoothedLandmarks[i][0],
+          smoothedLandmarks[i][1],
+          smoothedLandmarks[j][0],
+          smoothedLandmarks[j][1]
+        );
+      }
     }
 
-    // Draw connections for each finger
-    for (let finger = 0; finger < 5; finger++) {
-      const baseIndex = finger === 0 ? 0 : finger * 4 + 1;
-      for (let i = 0; i < 3; i++) {
-        const a = hand.landmarks[baseIndex + i];
-        const b = hand.landmarks[baseIndex + i + 1];
-        line(a[0], a[1], b[0], b[1]);
+    // Draw finger connections
+    strokeWeight(2);
+    for (const [i, j] of fingerIndices) {
+      if (smoothedLandmarks[i] && smoothedLandmarks[j]) {
+        line(
+          smoothedLandmarks[i][0],
+          smoothedLandmarks[i][1],
+          smoothedLandmarks[j][0],
+          smoothedLandmarks[j][1]
+        );
       }
     }
   }
@@ -332,5 +423,63 @@ function stopCurrentNote() {
   if (activeNote !== null) {
     synth.triggerRelease(activeNote);
     activeNote = null;
+  }
+}
+
+// Add a function to draw the hand mesh with confidence indicator
+function drawHandMesh() {
+  if (handPredictions.length > 0 && smoothedLandmarks.length > 0) {
+    const hand = handPredictions[0];
+
+    // Get the current detected note and its confidence
+    const detectedNote = currentNote !== "None" ? currentNote : null;
+    const confidence = detectedNote
+      ? handPoseDetection.signConfidences[detectedNote]
+      : 0;
+
+    // Draw hand mesh outline
+    strokeWeight(2);
+    noFill();
+
+    // Color the outline based on note and confidence
+    if (detectedNote) {
+      const intensity = map(confidence, 0.7, 1, 100, 255);
+      stroke(100, intensity, 100, 230);
+    } else {
+      stroke(255, 255, 255, 150);
+    }
+
+    beginShape();
+    // Create outline around the hand's key points
+    const outlinePoints = [0, 1, 2, 3, 4, 8, 12, 16, 20, 19, 18, 17, 0];
+    for (const i of outlinePoints) {
+      if (smoothedLandmarks[i]) {
+        vertex(smoothedLandmarks[i][0], smoothedLandmarks[i][1]);
+      }
+    }
+    endShape(CLOSE);
+
+    // Add a confident note indicator if applicable
+    if (detectedNote) {
+      // Find the center of the palm for text positioning
+      const centerX = smoothedLandmarks[0][0];
+      const centerY = smoothedLandmarks[0][1] - 40;
+
+      // Draw background for text
+      noStroke();
+      fill(40, 40, 40, 180);
+      rect(centerX - 25, centerY - 15, 50, 25, 5);
+
+      // Draw text
+      fill(255);
+      textAlign(CENTER, CENTER);
+      textSize(16);
+      text(detectedNote, centerX, centerY);
+      textSize(10);
+      text(Math.round(confidence * 100) + "%", centerX, centerY + 12);
+
+      // Reset text alignment
+      textAlign(LEFT);
+    }
   }
 }
