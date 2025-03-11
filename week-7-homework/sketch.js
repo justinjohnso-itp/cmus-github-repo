@@ -30,6 +30,9 @@ let smoothedLandmarks = [];
 const smoothingFactor = 0.7; // Higher = more smoothing, range 0-1
 let isFirstPrediction = true;
 
+// Add at the top with other global variables
+let isCalibrationMode = false;
+
 function preload() {
   // Load the reference image
   referenceImg = loadImage("images/solfege-hand-signs.png");
@@ -50,71 +53,81 @@ function setup() {
   // Initialize the synthesizer
   synth = new Tone.PolySynth(Tone.Synth).toDestination();
 
-  // Initialize handpose detection using the module
-  handPoseDetection.init(
-    video,
-    // Model ready callback
-    () => {
-      select("#status").html("Model loaded, show your hand signs!");
-    },
-    // Detection callback
-    (detectedNote, results) => {
-      // Store predictions for drawing
-      handPredictions = results || [];
-
-      // Apply smoothing to landmarks if predictions exist
-      if (handPredictions.length > 0) {
-        const currentLandmarks = handPredictions[0].landmarks;
-
-        // Initialize smoothed landmarks on first prediction
-        if (isFirstPrediction || smoothedLandmarks.length === 0) {
-          smoothedLandmarks = [...currentLandmarks];
-          isFirstPrediction = false;
+  // Initialize model handler
+  modelHandler.loadModel().then(() => {
+    // Initialize handpose detection using the module
+    handPoseDetection.init(
+      video,
+      // Model ready callback
+      () => {
+        select("#status").html("Models loaded, show your hand signs!");
+      },
+      // Detection callback
+      (detectedNote, results) => {
+        handPredictions = results || [];
+        
+        if (isCalibrationMode && handPredictions.length > 0) {
+          // Send landmarks to calibration system
+          collectSample(handPredictions[0].landmarks);
         } else {
-          // Apply exponential smoothing to each landmark
-          for (let i = 0; i < currentLandmarks.length; i++) {
-            if (!smoothedLandmarks[i]) {
-              smoothedLandmarks[i] = [...currentLandmarks[i]];
+          // Apply smoothing to landmarks if predictions exist
+          if (handPredictions.length > 0) {
+            const currentLandmarks = handPredictions[0].landmarks;
+
+            // Initialize smoothed landmarks on first prediction
+            if (isFirstPrediction || smoothedLandmarks.length === 0) {
+              smoothedLandmarks = [...currentLandmarks];
+              isFirstPrediction = false;
             } else {
-              for (let j = 0; j < 3; j++) {
-                smoothedLandmarks[i][j] =
-                  smoothedLandmarks[i][j] * smoothingFactor +
-                  currentLandmarks[i][j] * (1 - smoothingFactor);
+              // Apply exponential smoothing to each landmark
+              for (let i = 0; i < currentLandmarks.length; i++) {
+                if (!smoothedLandmarks[i]) {
+                  smoothedLandmarks[i] = [...currentLandmarks[i]];
+                } else {
+                  for (let j = 0; j < 3; j++) {
+                    smoothedLandmarks[i][j] =
+                      smoothedLandmarks[i][j] * smoothingFactor +
+                      currentLandmarks[i][j] * (1 - smoothingFactor);
+                  }
+                }
               }
             }
           }
-        }
-      } else {
-        // Reset smoothing when no hand is detected
-        smoothedLandmarks = [];
-        isFirstPrediction = true;
-      }
 
-      // Handle note detection
-      if (detectedNote !== null && detectedNote !== currentNote) {
-        const now = millis();
-        if (now - lastPlayedTime > debounceDelay) {
-          // Stop any currently playing note
-          if (activeNote !== null) {
-            stopCurrentNote();
+          // Handle note detection and playback
+          if (detectedNote !== null && detectedNote !== currentNote) {
+            const now = millis();
+            if (now - lastPlayedTime > debounceDelay) {
+              if (activeNote !== null) {
+                stopCurrentNote();
+              }
+              currentNote = detectedNote;
+              updateNoteDisplay();
+              playNote(solfegeNotes[currentNote]);
+              lastPlayedTime = now;
+            }
+          } else if (detectedNote === null && currentNote !== "None") {
+            currentNote = "None";
+            updateNoteDisplay();
+            if (activeNote !== null) {
+              stopCurrentNote();
+            }
           }
-
-          // Update current note and play it
-          currentNote = detectedNote;
-          updateNoteDisplay();
-          playNote(solfegeNotes[currentNote]);
-          lastPlayedTime = now;
-        }
-      } else if (detectedNote === null && currentNote !== "None") {
-        // No hand detected, reset current note
-        currentNote = "None";
-        updateNoteDisplay();
-        if (activeNote !== null) {
-          stopCurrentNote();
         }
       }
-    }
-  );
+    );
+  });
+
+  // Add calibration setup
+  setupCalibration();
+  
+  // Add calibration toggle button
+  createButton('Toggle Calibration Mode')
+    .position(20, height - 40)
+    .mousePressed(() => {
+      isCalibrationMode = !isCalibrationMode;
+      select('#calibration-ui').style('display', isCalibrationMode ? 'block' : 'none');
+    });
 }
 
 // Remove the updateLayoutDimensions function since we're using static sizing

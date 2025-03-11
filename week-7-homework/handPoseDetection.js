@@ -51,83 +51,31 @@ const handPoseDetection = (function () {
     handpose = ml5.handpose(video, onReadyCallback);
 
     // Listen for predictions
-    handpose.on("predict", (results) => {
+    handpose.on("predict", async (results) => {
       internalPredictions = results;
 
       if (internalPredictions.length > 0) {
-        // Process hand to detect solfege signs
-        const hand = internalPredictions[0];
-        const landmarks = hand.landmarks;
-        const annotations = hand.annotations;
-
-        // Extract finger tips
-        const thumbTip = annotations.thumb[3];
-        const indexTip = annotations.indexFinger[3];
-        const middleTip = annotations.middleFinger[3];
-        const ringTip = annotations.ringFinger[3];
-        const pinkyTip = annotations.pinky[3];
-        const palmBase = landmarks[0];
-
-        // Calculate confidence scores for all signs
-        calculateSignConfidences(
-          thumbTip,
-          indexTip,
-          middleTip,
-          ringTip,
-          pinkyTip,
-          palmBase,
-          annotations
-        );
-
-        // Get detected sign (highest confidence above threshold)
-        let detectedNote = null;
-        const confidenceThreshold = 0.7;
-        let highestConfidence = 0;
-        let rawConfidences = {};
-
-        // Store raw confidence calculations before smoothing
-        for (const [note, confidence] of Object.entries(signConfidences)) {
-          rawConfidences[note] = confidence;
-
-          if (
-            confidence > confidenceThreshold &&
-            confidence > highestConfidence
-          ) {
-            highestConfidence = confidence;
-            detectedNote = note;
+        if (isCalibrationMode) {
+          // Handle calibration mode
+          if (onDetectionCallback) {
+            onDetectionCallback(null, internalPredictions);
           }
-        }
-
-        // Apply temporal smoothing to confidences
-        for (const note in signConfidences) {
-          signConfidences[note] =
-            previousConfidences[note] * confidenceSmoothingFactor +
-            rawConfidences[note] * (1 - confidenceSmoothingFactor);
-          previousConfidences[note] = signConfidences[note];
-        }
-
-        // Implement simple debouncing for more stable detection
-        if (detectedNote === lastDetectedNote && detectedNote !== null) {
-          noteDetectionCount++;
         } else {
-          noteDetectionCount = 0;
-          lastDetectedNote = detectedNote;
-        }
+          // Use trained model for detection
+          const hand = internalPredictions[0];
+          const detectedNote = await modelHandler.classifyPose(hand.landmarks);
 
-        // Only notify about a detected note if it's been stable for several frames
-        if (noteDetectionCount >= requiredConsistentFrames) {
-          // Use the debounced detection
+          // Update confidence scores for visualization
+          for (const note in signConfidences) {
+            signConfidences[note] = note === detectedNote ? 1.0 : 0.0;
+          }
+
           if (onDetectionCallback) {
             onDetectionCallback(detectedNote, internalPredictions);
           }
-        } else if (onDetectionCallback) {
-          // Don't change the note while we're waiting for stability
-          onDetectionCallback(null, internalPredictions);
         }
       } else if (onDetectionCallback) {
         // Reset when no hand is detected
-        noteDetectionCount = 0;
-        lastDetectedNote = null;
         onDetectionCallback(null, internalPredictions);
       }
     });
