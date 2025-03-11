@@ -260,7 +260,7 @@ function drawConfidenceBars() {
   fill(255);
   textSize(18);
   textAlign(CENTER, TOP);
-  text("Solfege Sign Confidence", width / 2, padding / 2);
+  text("Note Confidence", width / 2, padding / 2);
 
   // Draw threshold line
   stroke(255, 0, 0, 150);
