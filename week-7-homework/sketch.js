@@ -34,6 +34,11 @@ let isCalibrationMode = false;
 // Add this at the top with other globals
 let toggleButton;
 
+// Add these variables for stability detection
+let lastDetectedNote = null;
+let noteDetectionTime = 0;
+const noteDetectionDelay = 200; // Require 200ms of confident detection before playing
+
 function preload() {
   referenceImg = loadImage("images/solfege-hand-signs.png");
 }
@@ -88,21 +93,37 @@ function setup() {
             }
           }
 
-          // Handle note detection and playback - UPDATED FOR SUSTAINED NOTES
-          if (detectedNote !== null && detectedNote !== currentNote) {
-            const now = millis();
-            if (now - lastPlayedTime > debounceDelay) {
+          // Stable detection before triggering note
+          const now = millis();
+
+          if (detectedNote !== null) {
+            if (detectedNote !== lastDetectedNote) {
+              // New note detected, reset timer
+              lastDetectedNote = detectedNote;
+              noteDetectionTime = now;
+            } else if (
+              lastDetectedNote === detectedNote &&
+              now - noteDetectionTime >= noteDetectionDelay &&
+              detectedNote !== currentNote
+            ) {
+              // Same note detected for required delay and it's different from current playing note
               if (activeNote !== null) {
                 stopCurrentNote();
               }
               currentNote = detectedNote;
-              startSustainedNote(solfegeNotes[currentNote]); // Changed to sustained notes
+              startSustainedNote(solfegeNotes[currentNote]);
               lastPlayedTime = now;
             }
-          } else if (detectedNote === null && currentNote !== "None") {
-            currentNote = "None";
-            if (activeNote !== null) {
-              stopCurrentNote();
+          } else {
+            // No note detected, reset detection
+            lastDetectedNote = null;
+
+            // If we were playing a note but now nothing is detected
+            if (currentNote !== "None") {
+              currentNote = "None";
+              if (activeNote !== null) {
+                stopCurrentNote();
+              }
             }
           }
         }
@@ -485,12 +506,37 @@ function drawHandMesh() {
       push();
       translate(centerX, centerY);
       scale(-1, 1); // Flip the text so it's readable
+
+      // Show note and confidence
       fill(255);
       textAlign(CENTER, CENTER);
       textSize(16);
       text(detectedNote, 0, 0);
+
+      // Show confidence and detection progress
       textSize(10);
-      text(Math.round(confidence * 100) + "%", 0, 12);
+      const now = millis();
+
+      if (lastDetectedNote === detectedNote) {
+        // Calculate and show progress toward activation
+        const progress = min(1, (now - noteDetectionTime) / noteDetectionDelay);
+        text(
+          Math.round(confidence * 100) + "% " + (progress < 1 ? "..." : "✓"),
+          0,
+          12
+        );
+
+        // Draw progress bar
+        if (progress < 1) {
+          fill(255, 255, 255, 100);
+          rect(-20, 18, 40, 3); // Background bar
+          fill(50, 255, 100, 230);
+          rect(-20, 18, 40 * progress, 3); // Progress indicator
+        }
+      } else {
+        text(Math.round(confidence * 100) + "%", 0, 12);
+      }
+
       pop();
 
       textAlign(LEFT);
