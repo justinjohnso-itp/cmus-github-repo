@@ -60,7 +60,7 @@ function setup() {
       video,
       // Model ready callback
       () => {
-        select("#status").html("Models loaded, show your hand signs!");
+        select("#status").html("Model loaded!");
       },
       // Detection callback
       (detectedNote, results) => {
@@ -506,12 +506,16 @@ function drawHandMesh() {
       rect(centerX - 25, centerY - 15, 50, 25, 5);
 
       // Draw text
+      push();
+      translate(centerX, centerY);
+      scale(-1, 1);
       fill(255);
       textAlign(CENTER, CENTER);
       textSize(16);
-      text(detectedNote, centerX, centerY);
+      text(detectedNote, 0, 0);
       textSize(10);
-      text(Math.round(confidence * 100) + "%", centerX, centerY + 12);
+      text(Math.round(confidence * 100) + "%", 0, 12);
+      pop();
 
       // Reset text alignment
       textAlign(LEFT);
