@@ -1,5 +1,5 @@
 let video;
-let handPredictions = []; // Renamed from 'predictions' to avoid conflict
+let handPredictions = [];
 let synth;
 let currentNote = "None";
 let activeNote = null;
@@ -7,12 +7,10 @@ let lastPlayedTime = 0;
 let debounceDelay = 500; // ms delay to prevent rapid triggering
 let referenceImg; // Reference image for solfege hand signs
 
-// New global variables for layout
-let leftPanelWidth = 400; // Static width for left panel
-let padding = 20; // Padding for visual elements
-let confidenceDisplayHeight = 200; // Height for the confidence display (increased by 100px)
-
-// Remove the camera aspect ratio constraint variable
+// Layout variables
+let leftPanelWidth = 400;
+let padding = 20;
+let confidenceDisplayHeight = 200;
 
 // Solfege notes in "fixed do" starting at middle C
 const solfegeNotes = {
@@ -25,44 +23,40 @@ const solfegeNotes = {
   Ti: "B4",
 };
 
-// Add smoothing variables for the keypoints
+// Landmark smoothing variables
 let smoothedLandmarks = [];
-const smoothingFactor = 0.7; // Higher = more smoothing, range 0-1
+const smoothingFactor = 0.7;
 let isFirstPrediction = true;
 
-// Add at the top with other global variables
+// Calibration mode flag
 let isCalibrationMode = false;
 
+// Add this at the top with other globals
+let toggleButton;
+
 function preload() {
-  // Load the reference image
   referenceImg = loadImage("images/solfege-hand-signs.png");
 }
 
 function setup() {
-  // Create a static sized canvas matching our video dimensions
-  createCanvas(1080, 720); // Reduced width from 1280 to 1080 (200px narrower)
-
-  // Set fixed left panel width
+  createCanvas(1080, 720);
   leftPanelWidth = 400;
 
-  // Initialize video with standard dimensions
+  // Initialize video
   video = createCapture(VIDEO);
   video.size(640, 480);
   video.hide();
 
-  // Initialize the synthesizer
+  // Initialize synthesizer
   synth = new Tone.PolySynth(Tone.Synth).toDestination();
 
-  // Initialize model handler
+  // Initialize model and handpose detection
   modelHandler.loadModel().then(() => {
-    // Initialize handpose detection using the module
     handPoseDetection.init(
       video,
-      // Model ready callback
       () => {
         select("#status").html("Model loaded!");
       },
-      // Detection callback
       (detectedNote, results) => {
         handPredictions = results || [];
 
@@ -74,12 +68,12 @@ function setup() {
           if (handPredictions.length > 0) {
             const currentLandmarks = handPredictions[0].landmarks;
 
-            // Initialize smoothed landmarks on first prediction
+            // Initialize or update smoothed landmarks
             if (isFirstPrediction || smoothedLandmarks.length === 0) {
               smoothedLandmarks = [...currentLandmarks];
               isFirstPrediction = false;
             } else {
-              // Apply exponential smoothing to each landmark
+              // Apply exponential smoothing
               for (let i = 0; i < currentLandmarks.length; i++) {
                 if (!smoothedLandmarks[i]) {
                   smoothedLandmarks[i] = [...currentLandmarks[i]];
@@ -116,66 +110,68 @@ function setup() {
     );
   });
 
-  // Add calibration setup
+  // Setup calibration
   setupCalibration();
 
-  // Add calibration toggle button (centered and 20px below canvas)
-  const toggleBtn = createButton("Toggle Calibration Mode");
-  toggleBtn.position((windowWidth - toggleBtn.width) / 2, height + 200);
-  toggleBtn.mousePressed(() => {
+  // Add calibration toggle button - STORE THE REFERENCE
+  toggleButton = createButton("Toggle Calibration Mode");
+  toggleButton.position((windowWidth - 200) / 2, height + 200);
+  toggleButton.mousePressed(() => {
     isCalibrationMode = !isCalibrationMode;
-    select("#calibration-ui").style(
-      "display",
-      isCalibrationMode ? "block" : "none"
-    );
+
+    // When toggling, immediately update the position
+    const ui = select("#calibration-ui");
+    if (ui) {
+      ui.style("display", isCalibrationMode ? "block" : "none");
+
+      // Set position immediately after display change
+      positionCalibrationUI();
+    }
   });
 
-  // Place calibration UI below button
-  positionCalibrationUI();
+  // Position calibration UI after a short delay to ensure DOM is ready
+  setTimeout(positionCalibrationUI, 500);
 }
 
-// Function to position calibration UI below toggle button
 function positionCalibrationUI() {
-  const toggleBtn = select("button");
-  if (toggleBtn && select("#calibration-ui")) {
-    const buttonHeight = 38; // Approximate button height
+  // Get button element directly from our reference
+  if (toggleButton && select("#calibration-ui")) {
+    const buttonPos = toggleButton.position();
+    const buttonSize = toggleButton.size();
+
+    // Position UI exactly 20px below the button
     select("#calibration-ui").style(
       "top",
-      height + 20 + buttonHeight + 200 + "px"
-    ); // 20px below button
+      buttonPos.y + buttonSize.height + 20 + "px"
+    );
   }
 }
-
-// Remove the updateLayoutDimensions function since we're using static sizing
-
-// Remove the windowResized function since we're using static sizing
 
 function draw() {
   background(220);
 
-  // Draw confidence bars at the top of the screen
+  // Draw confidence bars
   drawConfidenceBars();
 
-  // Draw dividing line between panels
+  // Draw dividing line
   stroke(180);
   strokeWeight(2);
   line(leftPanelWidth, confidenceDisplayHeight, leftPanelWidth, height);
   noStroke();
 
-  // Draw reference image in the left panel
+  // Draw reference image
   drawReferenceImage();
 
-  // Draw video feed on the right side
-  const videoX = leftPanelWidth + 20; // Position to the right of left panel
-  const videoY = confidenceDisplayHeight + 20; // Position below confidence display
+  // Draw video feed
+  const videoX = leftPanelWidth + 20;
+  const videoY = confidenceDisplayHeight + 20;
 
   push();
-  // Flip the video horizontally so it's like a mirror
   translate(videoX + video.width, videoY);
   scale(-1, 1);
   image(video, 0, 0);
 
-  // Draw hand visualization directly over the video
+  // Draw hand visualization
   if (handPredictions.length > 0) {
     drawConnectors();
     drawKeypoints();
@@ -184,14 +180,13 @@ function draw() {
   pop();
 }
 
-// Separate function to draw reference image for cleaner code
 function drawReferenceImage() {
   if (referenceImg) {
-    // Calculate available space within left panel
+    // Calculate available space
     const availableWidth = leftPanelWidth - padding * 2;
     const availableHeight = height - confidenceDisplayHeight - padding * 5;
 
-    // Calculate dimensions for image maintaining aspect ratio
+    // Calculate dimensions maintaining aspect ratio
     const imgAspect = referenceImg.width / referenceImg.height;
     let imgWidth, imgHeight;
 
@@ -203,12 +198,12 @@ function drawReferenceImage() {
       imgHeight = imgWidth / imgAspect;
     }
 
-    // Center the image in the left panel
+    // Position the image
     const imgX = (leftPanelWidth - imgWidth) / 2;
     const imgY =
       confidenceDisplayHeight + (availableHeight - imgHeight) / 2 + padding * 3;
 
-    // Draw the reference image with a subtle border
+    // Draw image with border
     stroke(180);
     strokeWeight(1);
     fill(255);
@@ -217,7 +212,7 @@ function drawReferenceImage() {
 
     image(referenceImg, imgX, imgY, imgWidth, imgHeight);
 
-    // Add a title above the reference image
+    // Add title
     fill(40);
     textAlign(CENTER);
     textSize(18);
@@ -228,19 +223,17 @@ function drawReferenceImage() {
 
 function drawConfidenceBars() {
   const numNotes = Object.keys(handPoseDetection.signConfidences).length;
-  const maxBarHeight = 120; // Increased height for bars (was 80)
+  const maxBarHeight = 120;
 
-  // Calculate bar sizes based on available width
+  // Calculate bar dimensions
   const barAreaWidth = width - padding * 2;
   const barWidth = (barAreaWidth - (numNotes - 1) * padding) / numNotes;
-
-  // Top position for confidence display
   const startY = padding * 2.5 + maxBarHeight;
   const startX = padding;
 
-  // Draw background panel
+  // Draw panel background
   fill(120, 120, 120, 200);
-  rect(0, 0, width, confidenceDisplayHeight, 0, 0, 10, 10); // Rounded bottom corners
+  rect(0, 0, width, confidenceDisplayHeight, 0, 0, 10, 10);
 
   // Draw title
   fill(255);
@@ -248,7 +241,7 @@ function drawConfidenceBars() {
   textAlign(CENTER, TOP);
   text("Solfege Sign Confidence", width / 2, padding / 2);
 
-  // Draw threshold indicator across all bars
+  // Draw threshold line
   stroke(255, 0, 0, 150);
   strokeWeight(1);
   const thresholdY = startY - maxBarHeight * 0.7;
@@ -260,35 +253,31 @@ function drawConfidenceBars() {
   textAlign(RIGHT);
   text("70% threshold", width - padding - 5, thresholdY - 5);
 
-  // Draw bars
+  // Draw bars for each note
   let x = startX;
   for (const [sign, confidence] of Object.entries(
     handPoseDetection.signConfidences
   )) {
     // Bar background
     fill(80);
-    rect(x, startY - maxBarHeight, barWidth, maxBarHeight, 3); // Rounded corners
+    rect(x, startY - maxBarHeight, barWidth, maxBarHeight, 3);
 
-    // Bar fill
+    // Bar fill based on confidence
     const barHeight = confidence * maxBarHeight;
-
-    // Color based on if it's the current note
     if (sign === currentNote) {
-      fill(50, 255, 100); // Brighter green for current note
+      fill(50, 255, 100); // Highlight current note
     } else {
-      // Color based on confidence
+      // Color gradient based on confidence
       const r = map(confidence, 0, 1, 100, 220);
       const g = map(confidence, 0, 1, 100, 220);
       const b = 100;
       fill(r, g, b, 220);
     }
 
-    rect(x, startY - barHeight, barWidth, barHeight, 3); // Rounded corners
+    rect(x, startY - barHeight, barWidth, barHeight, 3);
 
     // Note label
     textAlign(CENTER);
-
-    // Note label with better contrast
     fill(255);
     textSize(16);
     text(sign, x + barWidth / 2, startY - maxBarHeight - 5);
@@ -297,12 +286,10 @@ function drawConfidenceBars() {
     if (confidence > 0.05) {
       textSize(14);
       const percentText = Math.round(confidence * 100) + "%";
-
-      // Position the text inside or above the bar
       const textY =
         barHeight > 25 ? startY - barHeight + 15 : startY - maxBarHeight - 25;
 
-      // Text with contrast enhancement
+      // Add background for readability
       if (barHeight <= 25) {
         fill(0, 0, 0, 50);
         rect(x + 2, textY - 12, barWidth - 4, 20, 5);
@@ -315,18 +302,13 @@ function drawConfidenceBars() {
     x += barWidth + padding;
   }
 
-  // Reset text alignment
   textAlign(LEFT);
   noStroke();
 }
 
 function drawKeypoints() {
   if (handPredictions.length > 0 && smoothedLandmarks.length > 0) {
-    // Enhanced drawing - larger points at key landmark positions
     const keyLandmarks = [0, 4, 8, 12, 16, 20]; // Wrist and fingertips
-
-    // Draw finger connections with thicker lines for better visibility
-    drawConnectors();
 
     // Draw landmarks with varying sizes
     for (let i = 0; i < smoothedLandmarks.length; i++) {
@@ -334,16 +316,16 @@ function drawKeypoints() {
 
       // Different visualization for key landmarks
       if (keyLandmarks.includes(i)) {
-        // Fingertips and wrist get larger circles
+        // Fingertips and wrist
         noStroke();
         fill(0, 255, 0, 200);
         ellipse(keypoint[0], keypoint[1], 14, 14);
 
-        // Add highlight effect
+        // Highlight
         fill(255, 255, 255, 150);
         ellipse(keypoint[0], keypoint[1], 8, 8);
       } else {
-        // Other landmarks get smaller circles
+        // Other landmarks
         noStroke();
         fill(0, 255, 0, 150);
         ellipse(keypoint[0], keypoint[1], 8, 8);
@@ -354,9 +336,7 @@ function drawKeypoints() {
 
 function drawConnectors() {
   if (handPredictions.length > 0 && smoothedLandmarks.length > 0) {
-    // Using landmark connections as defined by MediaPipe hand tracking
-
-    // Palm connections
+    // Define hand connections
     const palmIndices = [
       [0, 1],
       [0, 5],
@@ -366,7 +346,6 @@ function drawConnectors() {
       [3, 4],
     ];
 
-    // Finger connections
     const fingerIndices = [
       // Thumb
       [1, 5],
@@ -392,7 +371,7 @@ function drawConnectors() {
       [17, 0],
     ];
 
-    // Draw palm mesh with thicker lines
+    // Draw palm connections
     stroke(0, 255, 0, 220);
     strokeWeight(3);
     for (const [i, j] of palmIndices) {
@@ -422,16 +401,15 @@ function drawConnectors() {
 }
 
 function playNote(note) {
-  // Initialize Tone.js context if it's suspended
+  // Initialize Tone.js context if needed
   if (Tone.context.state !== "running") {
     Tone.start();
   }
 
-  // Play note with synth
+  // Play note
   synth.triggerAttackRelease(note, "8n");
 }
 
-// Handle mouse press to initialize audio context
 function mousePressed() {
   if (Tone.context.state !== "running") {
     Tone.start();
@@ -439,7 +417,7 @@ function mousePressed() {
 }
 
 function startSustainedNote(note) {
-  // Initialize Tone.js context if it's suspended
+  // Initialize Tone.js context if needed
   if (Tone.context.state !== "running") {
     Tone.start();
   }
@@ -449,7 +427,7 @@ function startSustainedNote(note) {
     synth.triggerRelease(activeNote);
   }
 
-  // Start the new note
+  // Start new note
   synth.triggerAttack(note);
   activeNote = note;
 }
@@ -461,22 +439,19 @@ function stopCurrentNote() {
   }
 }
 
-// Add a function to draw the hand mesh with confidence indicator
 function drawHandMesh() {
   if (handPredictions.length > 0 && smoothedLandmarks.length > 0) {
-    const hand = handPredictions[0];
-
-    // Get the current detected note and its confidence
+    // Get current detection info
     const detectedNote = currentNote !== "None" ? currentNote : null;
     const confidence = detectedNote
       ? handPoseDetection.signConfidences[detectedNote]
       : 0;
 
-    // Draw hand mesh outline
+    // Draw hand outline
     strokeWeight(2);
     noFill();
 
-    // Color the outline based on note and confidence
+    // Color based on confidence
     if (detectedNote) {
       const intensity = map(confidence, 0.7, 1, 100, 255);
       stroke(100, intensity, 100, 230);
@@ -484,8 +459,8 @@ function drawHandMesh() {
       stroke(255, 255, 255, 150);
     }
 
+    // Create hand outline
     beginShape();
-    // Create outline around the hand's key points
     const outlinePoints = [0, 1, 2, 3, 4, 8, 12, 16, 20, 19, 18, 17, 0];
     for (const i of outlinePoints) {
       if (smoothedLandmarks[i]) {
@@ -494,21 +469,21 @@ function drawHandMesh() {
     }
     endShape(CLOSE);
 
-    // Add a confident note indicator if applicable
+    // Show note indicator
     if (detectedNote) {
-      // Find the center of the palm for text positioning
+      // Position in palm
       const centerX = smoothedLandmarks[0][0];
       const centerY = smoothedLandmarks[0][1] - 40;
 
-      // Draw background for text
+      // Draw text background
       noStroke();
       fill(40, 40, 40, 180);
       rect(centerX - 25, centerY - 15, 50, 25, 5);
 
-      // Draw text
+      // Draw label
       push();
       translate(centerX, centerY);
-      scale(-1, 1);
+      scale(-1, 1); // Flip the text so it's readable
       fill(255);
       textAlign(CENTER, CENTER);
       textSize(16);
@@ -517,7 +492,6 @@ function drawHandMesh() {
       text(Math.round(confidence * 100) + "%", 0, 12);
       pop();
 
-      // Reset text alignment
       textAlign(LEFT);
     }
   }

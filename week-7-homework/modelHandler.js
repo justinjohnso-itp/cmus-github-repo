@@ -1,4 +1,4 @@
-const modelHandler = (function() {
+const modelHandler = (function () {
   let model;
   let isModelReady = false;
   let onDetectionCallback;
@@ -7,22 +7,22 @@ const modelHandler = (function() {
     try {
       // Load the model from the models directory
       model = await ml5.neuralNetwork({
-        task: 'classification',
-        debug: true
+        task: "classification",
+        debug: true,
       });
-      
+
       // Load the trained model files
       await model.load({
-        model: 'models/model.json',
-        metadata: 'models/model_meta.json',
-        weights: 'models/model.weights.bin'
+        model: "models/model.json",
+        metadata: "models/model_meta.json",
+        weights: "models/model.weights.bin",
       });
-      
+
       isModelReady = true;
-      console.log('Custom hand sign model loaded');
+      console.log("Custom hand sign model loaded");
       return true;
     } catch (error) {
-      console.error('Error loading model:', error);
+      console.error("Error loading model:", error);
       return false;
     }
   }
@@ -39,10 +39,10 @@ const modelHandler = (function() {
 
     const input = processLandmarks(landmarks);
     const results = await model.classify(input);
-    
+
     // Return the highest confidence prediction
     const topResult = results.reduce((prev, current) => {
-      return (prev.confidence > current.confidence) ? prev : current;
+      return prev.confidence > current.confidence ? prev : current;
     });
 
     return topResult.confidence > 0.7 ? topResult.label : null;
@@ -56,6 +56,6 @@ const modelHandler = (function() {
     loadModel,
     classifyPose,
     init,
-    isModelReady: () => isModelReady
+    isModelReady: () => isModelReady,
   };
-})(); 
+})();
